@@ -1,0 +1,65 @@
+# ============================================================================
+# trap-daemon 配置文件示例
+# 复制为 config.yaml 并修改后使用。
+# 所有路径均支持环境变量覆盖（见 README 的 TRAPD_* 说明）。
+# ============================================================================
+
+# ----- SNMP Trap 监听 -----
+snmp:
+  listenAddr: "0.0.0.0:162"   # UDP 监听地址（默认 162；非 root 可用 1162）
+  protocol: "v1v2c"            # v1v2c（默认）| v3（预留，尚未实现）
+  community: ""                # 可选 community；留空则接受所有（gosnmp 接收端不强制校验）
+  v3:                          # v3 预留配置（当前忽略）
+    enabled: false
+    user: ""
+    authProtocol: ""
+    authPassphrase: ""
+    privProtocol: ""
+    privPassphrase: ""
+
+# ----- OID 映射表（配置项，指向 mib-parser 生成产物，本项目不内置该文件）-----
+oidMap:
+  # 必填：mib-parser 全量生成输出的 oid-database.properties 路径。
+  # 每次 mib-parser 新增 MIB 支持后，更新并持久化该文件后重启 daemon。
+  path: "/opt/trap-daemon/oid-database.properties"
+  loadFailPolicy: "exit"       # exit（默认，加载失败即退出）| warn（降级为无字段名映射）
+
+# ----- cep-engine 转发目标 -----
+cepEngine:
+  baseUrl: "http://127.0.0.1:8080"          # cep-engine 根地址
+  batchPath: "/api/v1/events/batch"         # 批量接口（默认对齐 cep-engine 契约）
+  singlePath: "/api/v1/events"              # 单条降级接口
+  authToken: ""                             # 可选 Bearer token；空则不携带
+  timeoutMs: 5000                           # 单次请求超时
+  retryMax: 3                               # 失败最大重试次数
+  retryBaseMs: 200                          # 指数退避基数（毫秒）
+
+# ----- 批量队列 + 背压 -----
+forward:
+  batchSize: 50                 # 攒批条数阈值
+  batchFlushIntervalMs: 200     # 攒批时间阈值（毫秒）
+  workers: 4                    # worker pool 并发数
+  queueCapacity: 10000          # 有界队列容量
+  queueFullPolicy: "drop"       # drop（默认，丢弃并打印日志）| block | single
+  dropLogEnabled: true          # 丢弃时是否打印详细日志（含来源IP/trapOID/原因）
+
+# ----- 日志 -----
+logging:
+  level: "info"                 # debug | info | warn | error
+  file: ""                      # 日志文件路径；空则输出到 stdout
+  maxSizeMB: 100                # 单文件滚动大小上限
+  maxBackups: 5                 # 保留的历史文件数
+
+# ----- 自监控（Prometheus 抓取）-----
+metrics:
+  enabled: true                 # 是否启用自监控接口
+  listenAddr: ":9091"           # metrics HTTP 监听地址（独立于 SNMP 端口）
+  path: "/metrics"              # Prometheus 抓取路径
+  # 运行时自动暴露的指标（无需配置）：
+  #   trap_received_total        累计 trap 数量
+  #   trap_forward_total         转发成功数
+  #   trap_forward_failed_total  转发失败数
+  #   trap_dropped_total         丢弃数
+  #   queue_depth                当前队列深度
+  #   trapd_start_time_seconds   进程启动时间（unix）
+  #   trap_throughput_5m         last 5 mins 吞吐量（条/s，滑窗 Gauge）
