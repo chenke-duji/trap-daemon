@@ -13,7 +13,7 @@ func testDataPath(t *testing.T) string {
 		t.Fatalf("getwd: %v", err)
 	}
 	// wd is <repo>/internal/oidmap; testdata lives at repo/testdata
-	path := filepath.Join(wd, "..", "..", "testdata", "oid-database.properties")
+	path := filepath.Join(wd, "..", "..", "testdata", "oid-database.db")
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("testdata missing at %s: %v", path, err)
 	}

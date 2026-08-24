@@ -11,7 +11,7 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
 ## 功能特性
 
 - **SNMP Trap 接收**：监听 UDP 162，支持 v1/v2c 解析，预留 v3 扩展点
-- **OID → 字段名映射**：加载 `oid-database.properties`（mib-parser 产物），对
+- **OID → 字段名映射**：加载 `oid-database.db`（mib-parser 产物），对
   varbind 完整实例 OID 做最长前缀匹配得到字段名
 - **RawEvent 构造**：严格对齐 cep-engine 摄取契约
 - **REST 批量转发**：worker pool 攒批 POST `/api/v1/events/batch`，指数退避重试，
@@ -27,7 +27,7 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
                                        │
                  ┌─────────────────────┤
                  ▼                     ▼
-        gosnmp TrapListener      OID 映射表(oid-database.properties)
+        gosnmp TrapListener      OID 映射表(oid-database.db)
                  │                     │
                  ▼                     │
               TrapDecoder ────────────┤  varbind OID -> 字段名
@@ -52,7 +52,7 @@ trap-daemon/
 ├── internal/
 │   ├── config/              # YAML 配置加载 + env 覆盖
 │   ├── snmp/                # TrapDecoder 接口 + v1/v2c 实现
-│   ├── oidmap/              # oid-database.properties 加载 + 最长前缀匹配
+│   ├── oidmap/              # oid-database.db 加载 + 最长前缀匹配
 │   ├── model/               # RawEvent 模型（对齐 cep-engine 契约）
 │   ├── forward/             # 批量队列/背压 + HTTP/Kafka 转发器
 │   └── metrics/             # Prometheus 指标
@@ -112,7 +112,7 @@ x86_64/aarch64 Linux 发行版。已在 WSL AlmaLinux-8 原生编译（Go 1.27.0
 
 将 `config.example.yaml` 复制为 `config.yaml` 并填写：
 
-- `oidMap.path`：**必填**，指向 mib-parser 生成的 `oid-database.properties`
+- `oidMap.path`：**必填**，指向 mib-parser 生成的 `oid-database.db`
   （本项目不内置该文件）。每次 mib-parser 新增 MIB 支持后更新并持久化该文件，
   重启 daemon 生效。
 - `cepEngine.baseUrl`：**必填**，cep-engine 根地址。
@@ -190,7 +190,7 @@ daemon 构造的 `RawEvent` JSON（字段名与 cep-engine `com.raysdata.cep.mod
 
 1. 部署 2 个及以上 trap-daemon 实例，均监听 UDP 162（可位于不同主机，或通过
    负载均衡/anycast 分发 trap）。
-2. 所有实例配置指向**同一** cep-engine 与**同一** `oid-database.properties`。
+2. 所有实例配置指向**同一** cep-engine 与**同一** `oid-database.db`。
 3. 各实例独立转发同一 trap 到 cep-engine；cep-engine 的
    `TransportDeduplicator`（TTL 10s）自动丢弃重复事件。
 4. 无需选主、无 failover 延迟；某实例宕机不影响其它实例收 trap。

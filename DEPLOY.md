@@ -6,7 +6,15 @@
 
 - Go 1.22+（仅构建时需要；运行只需编译产物二进制）
 - cep-engine 已部署并可通过 `cepEngine.baseUrl` 访问
-- mib-parser 生成的 `oid-database.properties` 已持久化（`oidMap.path` 指向它）
+- mib-parser 生成的 `oid-database.db` 已持久化（`oidMap.path` 指向它）。全量库在
+  mib-parser 产物目录生成，部署时拷贝到 daemon 目录，例如：
+
+  ```bash
+  # 从 mib-parser 全量产物拷贝到本机部署位置
+  mkdir -p /opt/trap-daemon
+  cp D:/63.CEP/mib-parser/output/oid-database.db /opt/trap-daemon/oid-database.db
+  # 然后在 config.yaml 中 oidMap.path 指向 /opt/trap-daemon/oid-database.db
+  ```
 
 ## 构建
 
@@ -121,7 +129,7 @@ nssm start TrapDaemon
 为每个实例创建独立 systemd 服务（或在不同主机部署），所有实例：
 
 1. 监听 UDP 162（同一主机多实例需用不同端口 + 外部流量分发，或不同主机）
-2. 指向**同一** cep-engine 与**同一** `oid-database.properties`
+2. 指向**同一** cep-engine 与**同一** `oid-database.db`
 3. 各自转发，由 cep-engine `TransportDeduplicator`（TTL 10s）去重
 
 无需选主、无 failover 延迟。任一实例宕机不影响整体收包。

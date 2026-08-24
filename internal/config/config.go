@@ -160,7 +160,7 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("config: unsupported snmp.protocol %q (want v1v2c or v3)", cfg.SNMP.Protocol)
 	}
 	if cfg.OIDMap.Path == "" {
-		return fmt.Errorf("config: oidMap.path is required (point to mib-parser oid-database.properties)")
+		return fmt.Errorf("config: oidMap.path is required (point to mib-parser oid-database.db)")
 	}
 	if cfg.OIDMap.LoadFailPolicy == "" {
 		cfg.OIDMap.LoadFailPolicy = "exit"

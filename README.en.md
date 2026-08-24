@@ -14,7 +14,7 @@ Kafka is reserved as an optional forwarding channel.
 
 - **SNMP Trap reception**: listens on UDP 162, parses v1/v2c, with a reserved
   v3 extension point
-- **OID → field-name mapping**: loads `oid-database.properties` (mib-parser
+- **OID → field-name mapping**: loads `oid-database.db` (mib-parser
   output) and does longest-prefix matching of full instance OIDs to field names
 - **RawEvent construction**: strictly aligned with the cep-engine ingestion contract
 - **REST batch forwarding**: worker-pool batching POST to
@@ -32,7 +32,7 @@ Devices --SNMP v1/v2c Trap UDP:162--> trap-daemon
                                        |
                  ┌─────────────────────┤
                  ▼                     ▼
-        gosnmp TrapListener      OID map(oid-database.properties)
+        gosnmp TrapListener      OID map(oid-database.db)
                  │                     |
                  ▼                     |
               TrapDecoder ────────────┤  varbind OID -> field name
@@ -57,7 +57,7 @@ trap-daemon/
 ├── internal/
 │   ├── config/              # YAML config loading + env overrides
 │   ├── snmp/                # TrapDecoder interface + v1/v2c implementation
-│   ├── oidmap/              # oid-database.properties loading + longest-prefix match
+│   ├── oidmap/              # oid-database.db loading + longest-prefix match
 │   ├── model/               # RawEvent model (aligned with cep-engine)
 │   ├── forward/             # batch queue/backpressure + HTTP/Kafka forwarders
 │   └── metrics/             # Prometheus metrics
@@ -118,7 +118,7 @@ real v2c trap end-to-end (receive → field mapping → RawEvent → HTTP forwar
 
 Copy `config.example.yaml` to `config.yaml` and fill in:
 
-- `oidMap.path`: **required**, points to the `oid-database.properties` generated
+- `oidMap.path`: **required**, points to the `oid-database.db` generated
   by mib-parser (this project does not bundle the file). Update and persist the
   file whenever mib-parser adds MIB support, then restart the daemon.
 - `cepEngine.baseUrl`: **required**, the cep-engine root URL.
@@ -201,7 +201,7 @@ Key points:
 1. Deploy 2+ trap-daemon instances, each listening on UDP 162 (different hosts,
    or load-balanced/anycast trap distribution).
 2. All instances point to the **same** cep-engine and the **same**
-   `oid-database.properties`.
+   `oid-database.db`.
 3. Each instance forwards the same trap to cep-engine; cep-engine's
    `TransportDeduplicator` (TTL 10s) drops duplicates.
 4. No leader election, no failover delay; an instance outage does not affect

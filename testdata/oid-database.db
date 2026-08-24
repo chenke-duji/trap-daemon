@@ -1,0 +1,12 @@
+# OID Database - test fixture (small curated subset for unit/integration tests)
+# Format: <numeric-OID>=<symbol-name>
+1.3.6.1.2.1.1.1.0=sysDescr
+1.3.6.1.2.1.1.3.0=sysUpTime
+1.3.6.1.2.1.2.2.1.1=ifIndex
+1.3.6.1.2.1.2.2.1.2=ifDescr
+1.3.6.1.2.1.2.2.1.3=ifType
+1.3.6.1.2.1.2.2.1.5=ifSpeed
+1.3.6.1.2.1.2.2.1.6=ifPhysAddress
+1.3.6.1.2.1.2.2.1.7=ifAdminStatus
+1.3.6.1.2.1.2.2.1.8=ifOperStatus
+1.3.6.1.4.1.9.9.43.1.1.6.1=hwEntityDescr

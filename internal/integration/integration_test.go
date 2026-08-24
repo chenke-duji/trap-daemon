@@ -26,10 +26,10 @@ import (
 	"trap-daemon/internal/snmp"
 )
 
-// testdataPath resolves the repo testdata oid-database.properties.
+// testdataPath resolves the repo testdata oid-database.db.
 func testdataPath() string {
 	wd, _ := os.Getwd() // <repo>/internal/integration
-	return filepath.Join(wd, "..", "..", "testdata", "oid-database.properties")
+	return filepath.Join(wd, "..", "..", "testdata", "oid-database.db")
 }
 
 type mockCEPServer struct {

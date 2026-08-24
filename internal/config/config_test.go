@@ -21,7 +21,7 @@ func TestLoadDefaultsAndOverrides(t *testing.T) {
 snmp:
   listenAddr: "0.0.0.0:1162"
 oidMap:
-  path: "/opt/oid-database.properties"
+  path: "/opt/oid-database.db"
 cepEngine:
   baseUrl: "http://127.0.0.1:8080"
 forward:
@@ -37,7 +37,7 @@ forward:
 	if cfg.SNMP.Protocol != "v1v2c" {
 		t.Fatalf("expected default protocol v1v2c, got %s", cfg.SNMP.Protocol)
 	}
-	if cfg.OIDMap.Path != "/opt/oid-database.properties" {
+	if cfg.OIDMap.Path != "/opt/oid-database.db" {
 		t.Fatalf("oidMap path not applied: %s", cfg.OIDMap.Path)
 	}
 	if cfg.CEPEngine.BaseURL != "http://127.0.0.1:8080" {

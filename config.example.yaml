@@ -19,9 +19,9 @@ snmp:
 
 # ----- OID 映射表（配置项，指向 mib-parser 生成产物，本项目不内置该文件）-----
 oidMap:
-  # 必填：mib-parser 全量生成输出的 oid-database.properties 路径。
+  # 必填：mib-parser 全量生成输出的 oid-database.db 路径。
   # 每次 mib-parser 新增 MIB 支持后，更新并持久化该文件后重启 daemon。
-  path: "/opt/trap-daemon/oid-database.properties"
+  path: "/opt/trap-daemon/oid-database.db"
   loadFailPolicy: "exit"       # exit（默认，加载失败即退出）| warn（降级为无字段名映射）
 
 # ----- cep-engine 转发目标 -----

@@ -1,5 +1,5 @@
 // Package oidmap loads the OID -> symbol-name database produced by
-// mib-parser (oid-database.properties) and performs longest-prefix matching
+// mib-parser (oid-database.db) and performs longest-prefix matching
 // of a full instance OID (from a trap varbind) to a known field/object name.
 //
 // The database file is NOT bundled with this project; its path is a config
@@ -34,7 +34,7 @@ type Map struct {
 	nodes []node // sorted lexicographically by segments
 }
 
-// Load reads an oid-database.properties file and builds the prefix Map.
+// Load reads an oid-database.db file and builds the prefix Map.
 // It returns an error if the file cannot be read or no valid entry is parsed.
 func Load(path string) (*Map, error) {
 	f, err := os.Open(path)

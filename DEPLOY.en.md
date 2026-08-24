@@ -6,7 +6,16 @@
 
 - Go 1.22+ (only needed to build; runtime just needs the compiled binary)
 - cep-engine deployed and reachable via `cepEngine.baseUrl`
-- mib-parser `oid-database.properties` persisted (`oidMap.path` points to it)
+- mib-parser `oid-database.db` persisted (`oidMap.path` points to it). The full
+  database is generated in the mib-parser output directory; copy it to the daemon
+  host during deployment, e.g.:
+
+  ```bash
+  # Copy from the mib-parser full output to the local deployment location
+  mkdir -p /opt/trap-daemon
+  cp /path/to/mib-parser/output/oid-database.db /opt/trap-daemon/oid-database.db
+  # Then set oidMap.path to /opt/trap-daemon/oid-database.db in config.yaml
+  ```
 
 ## Build
 
@@ -125,7 +134,7 @@ All instances:
 
 1. listen on UDP 162 (multiple instances on one host need different ports plus
    external traffic distribution, or different hosts)
-2. point to the **same** cep-engine and the **same** `oid-database.properties`
+2. point to the **same** cep-engine and the **same** `oid-database.db`
 3. each forwards independently; cep-engine `TransportDeduplicator` (TTL 10s)
    deduplicates
 
