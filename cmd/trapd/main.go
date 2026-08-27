@@ -154,10 +154,19 @@ func handleTrap(pkt *gosnmp.SnmpPacket, src *net.UDPAddr, decoder snmp.TrapDecod
 
 	// fieldName closure consults the OID map (nil-safe).
 	var fieldName func(string) (string, bool)
+	trapName := td.TrapOID
 	if om != nil {
 		fieldName = om.Lookup
+		if n, ok := om.Lookup(td.TrapOID); ok {
+			trapName = n
+		}
 	}
 	ev := model.NewFromTrapData(td, fieldName)
+	logger.Info("received trap",
+		"sourceIp", td.SourceIP,
+		"trapName", trapName,
+		"trapOid", td.TrapOID,
+	)
 	q.Enqueue(ev)
 }
 
