@@ -29,10 +29,11 @@ import (
 
 var (
 	configPath = flag.String("config", "config.yaml", "path to YAML config file")
-	version    = flag.Bool("version", false, "print version and exit")
+	v          = flag.Bool("v", false, "print build/version info and exit")
+	version    = flag.Bool("version", false, "print build/version info and exit (alias of -v)")
 )
 
-// build info (overridable at link time).
+// build info (overridable at link time via -ldflags "-X main.buildVersion=... -X main.buildDate=...").
 var (
 	buildVersion = "dev"
 	buildDate    = "unknown"
@@ -40,7 +41,7 @@ var (
 
 func main() {
 	flag.Parse()
-	if *version {
+	if *v || *version {
 		fmt.Printf("trap-daemon %s (%s)\n", buildVersion, buildDate)
 		return
 	}
