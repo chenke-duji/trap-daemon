@@ -7,15 +7,21 @@
 # ----- SNMP Trap 监听 -----
 snmp:
   listenAddr: "0.0.0.0:162"   # UDP 监听地址（默认 162；非 root 可用 1162）
-  protocol: "v1v2c"            # v1v2c（默认）| v3（预留，尚未实现）
-  community: ""                # 可选 community；留空则接受所有（gosnmp 接收端不强制校验）
-  v3:                          # v3 预留配置（当前忽略）
-    enabled: false
-    user: ""
-    authProtocol: ""
-    authPassphrase: ""
-    privProtocol: ""
-    privPassphrase: ""
+  protocol: "v1v2c"            # v1v2c（默认）| v3 | both（同时接收 v1/v2c 和 v3）
+  communities: []              # v1/v2c community 白名单；留空则接受所有（启动时打印告警）
+                                # 示例: ["public", "private"]
+                                # v3 模式下此项忽略
+  v3:                          # SNMPv3 USM 凭证（protocol 为 v3 或 both 时生效）
+    enabled: true              #   仅作标记用；实际启用以 protocol 为准
+    user: "trapUser"           #   USM 用户名（必填）
+    authProtocol: "SHA256"     #   认证协议: none|MD5|SHA|SHA224|SHA256|SHA384|SHA512
+    authPassphrase: "changeMe123" # 认证密钥（authProtocol 非 none 时必填，>= 8 字符）
+    privProtocol: "AES256"     #   加密协议: none|DES|AES|AES192|AES256|AES192C|AES256C
+    privPassphrase: "changeMe456" # 加密密钥（privProtocol 非 none 时必填，>= 8 字符）
+                                # 安全等级:
+                                #   authProtocol=none + privProtocol=none -> NoAuthNoPriv
+                                #   authProtocol!=none + privProtocol=none -> AuthNoPriv
+                                #   authProtocol!=none + privProtocol!=none -> AuthPriv
 
 # ----- OID 映射表（配置项，指向 mib-parser 生成产物，本项目不内置该文件）-----
 oidMap:
@@ -53,7 +59,7 @@ logging:
 # ----- 自监控（Prometheus 抓取）-----
 metrics:
   enabled: true                 # 是否启用自监控接口
-  listenAddr: ":9091"           # metrics HTTP 监听地址（独立于 SNMP 端口）
+  listenAddr: "127.0.0.1:9091"  # metrics HTTP 监听地址（默认仅本机访问）
   path: "/metrics"              # Prometheus 抓取路径
   # 运行时自动暴露的指标（无需配置）：
   #   trap_received_total        累计 trap 数量

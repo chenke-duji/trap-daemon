@@ -95,3 +95,107 @@ func TestInvalidProtocol(t *testing.T) {
 		t.Fatal("expected error for unsupported protocol")
 	}
 }
+
+func TestProtocolBothAccepted(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SNMP.Protocol = "both"
+	cfg.SNMP.V3.User = "trapUser"
+	cfg.SNMP.V3.AuthProtocol = "SHA256"
+	cfg.SNMP.V3.AuthPassphrase = "passphrase123"
+	cfg.SNMP.V3.PrivProtocol = "AES256"
+	cfg.SNMP.V3.PrivPassphrase = "passphrase456"
+	cfg.OIDMap.Path = "/x"
+	cfg.CEPEngine.BaseURL = "http://x"
+	if err := validate(cfg); err != nil {
+		t.Fatalf("expected both protocol to be valid: %v", err)
+	}
+}
+
+func TestV3ValidationMissingUser(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SNMP.Protocol = "v3"
+	cfg.SNMP.V3.AuthProtocol = "SHA"
+	cfg.SNMP.V3.AuthPassphrase = "passphrase"
+	cfg.OIDMap.Path = "/x"
+	cfg.CEPEngine.BaseURL = "http://x"
+	if err := validate(cfg); err == nil {
+		t.Fatal("expected error for missing v3 user")
+	}
+}
+
+func TestV3ValidationPrivWithoutAuth(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SNMP.Protocol = "v3"
+	cfg.SNMP.V3.User = "trapUser"
+	cfg.SNMP.V3.AuthProtocol = "none"
+	cfg.SNMP.V3.PrivProtocol = "AES"
+	cfg.SNMP.V3.PrivPassphrase = "passphrase"
+	cfg.OIDMap.Path = "/x"
+	cfg.CEPEngine.BaseURL = "http://x"
+	if err := validate(cfg); err == nil {
+		t.Fatal("expected error for priv without auth")
+	}
+}
+
+func TestV3ValidationShortPassphrase(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SNMP.Protocol = "v3"
+	cfg.SNMP.V3.User = "trapUser"
+	cfg.SNMP.V3.AuthProtocol = "SHA"
+	cfg.SNMP.V3.AuthPassphrase = "short"
+	cfg.OIDMap.Path = "/x"
+	cfg.CEPEngine.BaseURL = "http://x"
+	if err := validate(cfg); err == nil {
+		t.Fatal("expected error for passphrase < 8 chars")
+	}
+}
+
+func TestV3ValidationNoAuthNoPriv(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SNMP.Protocol = "v3"
+	cfg.SNMP.V3.User = "trapUser"
+	cfg.SNMP.V3.AuthProtocol = "none"
+	cfg.SNMP.V3.PrivProtocol = "none"
+	cfg.OIDMap.Path = "/x"
+	cfg.CEPEngine.BaseURL = "http://x"
+	if err := validate(cfg); err != nil {
+		t.Fatalf("expected NoAuthNoPriv to be valid: %v", err)
+	}
+}
+
+func TestV3ValidationAuthNoPriv(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.SNMP.Protocol = "v3"
+	cfg.SNMP.V3.User = "trapUser"
+	cfg.SNMP.V3.AuthProtocol = "MD5"
+	cfg.SNMP.V3.AuthPassphrase = "passphrase"
+	cfg.SNMP.V3.PrivProtocol = "none"
+	cfg.OIDMap.Path = "/x"
+	cfg.CEPEngine.BaseURL = "http://x"
+	if err := validate(cfg); err != nil {
+		t.Fatalf("expected AuthNoPriv to be valid: %v", err)
+	}
+}
+
+func TestV3EnvOverride(t *testing.T) {
+	t.Setenv("TRAPD_SNMP_V3_ENABLED", "true")
+	t.Setenv("TRAPD_SNMP_V3_USER", "envUser")
+	t.Setenv("TRAPD_SNMP_V3_AUTHPROTOCOL", "SHA512")
+	t.Setenv("TRAPD_SNMP_V3_AUTHPASSPHRASE", "envPass123")
+
+	cfg := defaultConfig()
+	applyEnv(cfg)
+
+	if !cfg.SNMP.V3.Enabled {
+		t.Fatal("env v3 enabled not applied")
+	}
+	if cfg.SNMP.V3.User != "envUser" {
+		t.Fatalf("env v3 user not applied: %s", cfg.SNMP.V3.User)
+	}
+	if cfg.SNMP.V3.AuthProtocol != "SHA512" {
+		t.Fatalf("env v3 authProtocol not applied: %s", cfg.SNMP.V3.AuthProtocol)
+	}
+	if cfg.SNMP.V3.AuthPassphrase != "envPass123" {
+		t.Fatalf("env v3 authPassphrase not applied")
+	}
+}

@@ -87,15 +87,19 @@ func deriveOriginTimestamp(td *snmp.TrapData, rawText string) int64 {
 }
 
 // deterministicHash returns a stable int64 derived from the raw text.
+// Uses the first 8 bytes of SHA-256 as an unsigned 63-bit value to avoid
+// sign-overflow concerns from the left-shift accumulation.
 func deterministicHash(s string) int64 {
 	sum := sha256.Sum256([]byte(s))
-	// Use the first 8 bytes as an int64 (deterministic, not used as crypto).
-	var v int64
+	// Use the first 8 bytes as an unsigned 64-bit value.
+	var u uint64
 	for i := 0; i < 8; i++ {
-		v = v<<8 | int64(sum[i])
+		u = u<<8 | uint64(sum[i])
 	}
-	if v < 0 {
-		v = -v
+	// Fold into non-negative int64 range without overflow.
+	v := int64(u &^ (1 << 63)) // clear sign bit
+	if v == 0 {
+		v = 1 // ensure non-zero return
 	}
 	return v
 }

@@ -1,0 +1,92 @@
+# ============================================================================
+# trap-daemon systemd service unit
+# ============================================================================
+# Install:
+#   sudo cp deploy/trap-daemon.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now trap-daemon
+#
+# The binary must be at /opt/trap-daemon/bin/trapd (adjust ExecStart if different).
+# Config file at /opt/trap-daemon/config.yaml (see config.example.yaml).
+# ============================================================================
+
+[Unit]
+Description=SNMP Trap Daemon (trap-daemon)
+Documentation=https://github.com/your-org/trap-daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# ---- Runtime paths ----
+ExecStart=/opt/trap-daemon/bin/trapd -config /opt/trap-daemon/config.yaml
+WorkingDirectory=/opt/trap-daemon
+
+# ---- Run as non-root user ----
+User=trapd
+Group=trapd
+
+# ---- Privilege hardening ----
+# No escalation path: cannot gain new capabilities via setuid binaries.
+NoNewPrivileges=true
+
+# Restrict to essential capabilities only (UDP 162 < 1024 needs cap_net_bind_service).
+# If listening on port >= 1022 (e.g. 1162), remove cap_net_bind_service entirely.
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Filesystem isolation.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log/trap-daemon /opt/trap-daemon
+
+# Network namespace: keep network access (needs to listen UDP 162 + HTTP forward).
+# PrivateNetwork is NOT set — the daemon must receive traps and call cep-engine.
+
+# Device and kernel isolation.
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+
+# Restrict system calls to a sane subset (allows network I/O, file I/O, no module loading).
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @swap @reboot @clock @module @raw-io
+SystemCallErrorNumber=EPERM
+
+# Memory write protection.
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
+# Resource limits.
+LimitNOFILE=65536
+LimitNPROC=512
+
+# ---- Restart policy ----
+Restart=on-failure
+RestartSec=5s
+StartLimitBurst=10
+StartLimitIntervalSec=120
+
+# ---- Logging ----
+# systemd captures stdout/stderr → journald. Set logging.file="" in config.yaml
+# to use journald, or set a file path under /var/log/trap-daemon/.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trapd
+
+# ---- Security labels (SELinux) ----
+# On SELinux-enabled systems, uncomment to confine the service:
+# SELinuxContext=system_u:system_r:trapd_t:s0
+
+[Install]
+WantedBy=multi-user.target

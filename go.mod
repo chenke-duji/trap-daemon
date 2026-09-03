@@ -1,6 +1,6 @@
 module trap-daemon
 
-go 1.26.7
+go 1.26
 
 require (
 	github.com/gosnmp/gosnmp v1.44.0

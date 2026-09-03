@@ -9,7 +9,6 @@
 //	# comment
 //	1.3.6.1.2.1.2.2.1.1=ifIndex
 //	1.3.6.1.2.1.2.2.1.2=ifDescr
-//
 package oidmap
 
 import (
@@ -95,6 +94,10 @@ func (m *Map) Len() int {
 // loaded object nodes. It returns the matched symbol name (field name) and
 // true on success. If the OID cannot be parsed or no node is a prefix of it,
 // it returns ("", false) so the caller can fall back to the raw OID as key.
+//
+// Complexity: O(m·log n) where m = OID segment count (typically < 15) and
+// n = number of loaded entries. This replaces the previous O(n) linear
+// backward scan.
 func (m *Map) Lookup(fullInstanceOid string) (string, bool) {
 	if m == nil {
 		return "", false
@@ -104,15 +107,16 @@ func (m *Map) Lookup(fullInstanceOid string) (string, bool) {
 		return "", false
 	}
 
-	// Upper bound: index of first node with segments > target.
-	i := sort.Search(len(m.nodes), func(i int) bool {
-		return compareSegs(m.nodes[i].segments, segs) > 0
-	})
-
-	// Walk backwards from i-1 to find the longest node that is a prefix.
-	for k := i - 1; k >= 0; k-- {
-		if isPrefix(m.nodes[k].segments, segs) {
-			return m.nodes[k].name, true
+	// Try decreasing prefix lengths of the target OID — longest first.
+	// For each prefix, binary-search the sorted nodes for an exact match.
+	// The first (longest) prefix that matches a node is the result.
+	for plen := len(segs); plen >= 1; plen-- {
+		prefix := segs[:plen]
+		idx := sort.Search(len(m.nodes), func(i int) bool {
+			return compareSegs(m.nodes[i].segments, prefix) >= 0
+		})
+		if idx < len(m.nodes) && compareSegs(m.nodes[idx].segments, prefix) == 0 {
+			return m.nodes[idx].name, true
 		}
 	}
 	return "", false
@@ -141,19 +145,6 @@ func compareSegs(a, b []int) int {
 	default:
 		return 0
 	}
-}
-
-// isPrefix reports whether p is a prefix of s.
-func isPrefix(p, s []int) bool {
-	if len(p) > len(s) {
-		return false
-	}
-	for i := range p {
-		if p[i] != s[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // parseOID parses a dot-separated numeric OID string into a slice of ints.

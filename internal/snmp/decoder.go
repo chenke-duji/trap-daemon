@@ -1,8 +1,7 @@
 // Package snmp decodes SNMP Trap packets into a normalized TrapData used by
 // the rest of trap-daemon. The decoder consumes a parsed gosnmp.SnmpPacket
 // (which already carries v1/v2c/v3 information) and produces a standardized
-// structure. v1 and v2c are implemented today; v3 is a reserved extension
-// point that can reuse the same Decode entry.
+// structure. v1, v2c, and v3 are all implemented.
 package snmp
 
 import (
@@ -25,7 +24,7 @@ type Varbind struct {
 // version-specific ones (Enterprise/GenericTrap/SpecificTrap) are only set
 // for v1.
 type TrapData struct {
-	Version      string    // "1" or "2c" (v3 reserved: "3")
+	Version      string    // "1", "2c", or "3"
 	SourceIP     string    // UDP source address
 	TrapOID      string    // trap OID (v2c: snmpTrapOID value; v1: synthesized)
 	Enterprise   string    // v1 only
@@ -38,8 +37,7 @@ type TrapData struct {
 }
 
 // TrapDecoder decodes a parsed gosnmp packet into a TrapData.
-// Implementations are version-specific; v3 can be added later by implementing
-// this same interface.
+// Implementations are version-specific.
 type TrapDecoder interface {
 	// Version reports which SNMP version this decoder handles.
 	Version() string

@@ -1,10 +1,11 @@
-// Command trapd is the SNMP Trap Daemon: it listens for v1/v2c traps on UDP,
-// maps varbind OIDs to field names using the mib-parser OID database, builds
-// cep-engine RawEvents, and forwards them in batches over REST HTTP. It is
-// designed to run Active-Active (dedup happens in cep-engine).
+// Command trapd is the SNMP Trap Daemon: it listens for v1/v2c/v3 traps on
+// UDP, maps varbind OIDs to field names using the mib-parser OID database,
+// builds cep-engine RawEvents, and forwards them in batches over REST HTTP.
+// It is designed to run Active-Active (dedup happens in cep-engine).
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -26,6 +28,103 @@ import (
 	"trap-daemon/internal/oidmap"
 	"trap-daemon/internal/snmp"
 )
+
+// snmpV3Params builds a gosnmp.GoSNMP configured for V3 USM trap reception.
+// UnmarshalTrap auto-detects the packet version from the header, so this
+// listener can also decode v1/v2c traps when protocol is "both".
+func snmpV3Params(v3 config.V3Config, logger *slog.Logger) *gosnmp.GoSNMP {
+	authProto := parseV3AuthProtocol(v3.AuthProtocol)
+	privProto := parseV3PrivProtocol(v3.PrivProtocol)
+
+	msgFlags := gosnmp.NoAuthNoPriv
+	if authProto != gosnmp.NoAuth {
+		msgFlags = gosnmp.AuthNoPriv
+	}
+	if privProto != gosnmp.NoPriv {
+		msgFlags = gosnmp.AuthPriv
+	}
+
+	gosnmpLogger := gosnmp.NewLogger(slog.NewLogLogger(logger.Handler(), slog.LevelDebug))
+
+	return &gosnmp.GoSNMP{
+		Version:       gosnmp.Version3,
+		SecurityModel: gosnmp.UserSecurityModel,
+		MsgFlags:      msgFlags,
+		SecurityParameters: &gosnmp.UsmSecurityParameters{
+			UserName:                 v3.User,
+			AuthenticationProtocol:   authProto,
+			AuthenticationPassphrase: v3.AuthPassphrase,
+			PrivacyProtocol:          privProto,
+			PrivacyPassphrase:        v3.PrivPassphrase,
+			Logger:                   gosnmpLogger,
+		},
+		Logger: gosnmpLogger,
+	}
+}
+
+// parseV3AuthProtocol maps a config string to a gosnmp SnmpV3AuthProtocol.
+// Empty or "none" maps to NoAuth. Config validation ensures only valid
+// values reach this function; the default case is unreachable in production.
+func parseV3AuthProtocol(s string) gosnmp.SnmpV3AuthProtocol {
+	switch strings.ToLower(s) {
+	case "", "none":
+		return gosnmp.NoAuth
+	case "md5":
+		return gosnmp.MD5
+	case "sha":
+		return gosnmp.SHA
+	case "sha224":
+		return gosnmp.SHA224
+	case "sha256":
+		return gosnmp.SHA256
+	case "sha384":
+		return gosnmp.SHA384
+	case "sha512":
+		return gosnmp.SHA512
+	default:
+		return gosnmp.NoAuth
+	}
+}
+
+// parseV3PrivProtocol maps a config string to a gosnmp SnmpV3PrivProtocol.
+// Empty or "none" maps to NoPriv. Config validation ensures only valid
+// values reach this function; the default case is unreachable in production.
+func parseV3PrivProtocol(s string) gosnmp.SnmpV3PrivProtocol {
+	switch strings.ToLower(s) {
+	case "", "none":
+		return gosnmp.NoPriv
+	case "des":
+		return gosnmp.DES
+	case "aes":
+		return gosnmp.AES
+	case "aes192":
+		return gosnmp.AES192
+	case "aes256":
+		return gosnmp.AES256
+	case "aes192c":
+		return gosnmp.AES192C
+	case "aes256c":
+		return gosnmp.AES256C
+	default:
+		return gosnmp.NoPriv
+	}
+}
+
+// v3SecurityLevel returns the SNMPv3 security level label for logging.
+func v3SecurityLevel(v3 config.V3Config) string {
+	auth := parseV3AuthProtocol(v3.AuthProtocol)
+	priv := parseV3PrivProtocol(v3.PrivProtocol)
+	switch {
+	case auth == gosnmp.NoAuth && priv == gosnmp.NoPriv:
+		return "NoAuthNoPriv"
+	case auth != gosnmp.NoAuth && priv == gosnmp.NoPriv:
+		return "AuthNoPriv"
+	case auth != gosnmp.NoAuth && priv != gosnmp.NoPriv:
+		return "AuthPriv"
+	default:
+		return "Unknown"
+	}
+}
 
 var (
 	configPath = flag.String("config", "config.yaml", "path to YAML config file")
@@ -101,17 +200,53 @@ func main() {
 		"queueCapacity", cfg.Forward.QueueCapacity, "policy", cfg.Forward.QueueFullPolicy)
 
 	// Optional Prometheus self-monitoring endpoint.
+	var metricsSrv *http.Server
 	if cfg.Metrics.Enabled {
-		go serveMetrics(cfg.Metrics, metric, logger)
+		metricsSrv = startMetrics(cfg.Metrics, metric, logger)
 	}
 
 	// SNMP trap receiver.
-	decoder := snmp.NewV1V2cDecoder()
+	v1v2cDecoder := snmp.NewV1V2cDecoder()
+	var v3Decoder snmp.TrapDecoder
+	v3Enabled := cfg.SNMP.Protocol == "v3" || cfg.SNMP.Protocol == "both"
+	if v3Enabled {
+		v3Decoder = snmp.NewV3Decoder()
+	}
+	cc := newCommunityChecker(cfg.SNMP.Communities, logger)
 	tl := gosnmp.NewTrapListener()
-	tl.Params = gosnmp.Default // v2c default; UnmarshalTrap detects v1/v2c from the packet
+	if v3Enabled {
+		// V3 params also handle v1/v2c: UnmarshalTrap auto-detects version
+		// from the packet header, so a single listener covers "both".
+		tl.Params = snmpV3Params(cfg.SNMP.V3, logger)
+		secLevel := v3SecurityLevel(cfg.SNMP.V3)
+		logger.Info("SNMPv3 trap reception enabled",
+			"user", cfg.SNMP.V3.User,
+			"authProtocol", cfg.SNMP.V3.AuthProtocol,
+			"privProtocol", cfg.SNMP.V3.PrivProtocol,
+			"securityLevel", secLevel,
+		)
+		if secLevel == "NoAuthNoPriv" {
+			logger.Warn("SNMPv3 configured with NoAuthNoPriv: traps will be accepted without authentication or encryption (insecure)")
+		}
+	} else {
+		tl.Params = gosnmp.Default
+	}
 	tl.Params.Logger = gosnmp.NewLogger(slog.NewLogLogger(logger.Handler(), slog.LevelDebug))
 	tl.OnNewTrap = func(pkt *gosnmp.SnmpPacket, src *net.UDPAddr) {
-		handleTrap(pkt, src, decoder, om, q, logger)
+		// V3 packets use USM authentication, not community strings.
+		if pkt.Version != gosnmp.Version3 {
+			if !cc.accept(pkt, src) {
+				return
+			}
+		}
+		var dec snmp.TrapDecoder
+		switch pkt.Version {
+		case gosnmp.Version3:
+			dec = v3Decoder
+		default:
+			dec = v1v2cDecoder
+		}
+		handleTrap(pkt, src, dec, om, q, logger)
 	}
 
 	listenErr := make(chan error, 1)
@@ -138,9 +273,15 @@ func main() {
 	sig := <-sigCh
 	logger.Info("shutdown signal received", "signal", sig.String())
 
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
 	tl.Close()
 	q.Close()
 	_ = fwd.Close()
+	if metricsSrv != nil {
+		_ = metricsSrv.Shutdown(shutdownCtx)
+	}
 	logger.Info("trap-daemon stopped")
 }
 
@@ -171,15 +312,60 @@ func handleTrap(pkt *gosnmp.SnmpPacket, src *net.UDPAddr, decoder snmp.TrapDecod
 	q.Enqueue(ev)
 }
 
-// serveMetrics exposes the Prometheus endpoint until the process exits.
-func serveMetrics(cfg config.MetricsConfig, m *metrics.Metrics, logger *slog.Logger) {
+// communityChecker validates incoming trap communities against a configured
+// allowlist. If the allowlist is empty, all communities are accepted but a
+// startup warning is logged.
+type communityChecker struct {
+	allowed map[string]struct{}
+	log     *slog.Logger
+}
+
+func newCommunityChecker(communities []string, log *slog.Logger) *communityChecker {
+	cc := &communityChecker{
+		allowed: make(map[string]struct{}, len(communities)),
+		log:     log,
+	}
+	for _, c := range communities {
+		cc.allowed[c] = struct{}{}
+	}
+	if len(cc.allowed) == 0 {
+		log.Warn("no SNMP communities configured; all traps will be accepted (insecure)")
+	}
+	return cc
+}
+
+func (cc *communityChecker) accept(pkt *gosnmp.SnmpPacket, src *net.UDPAddr) bool {
+	if len(cc.allowed) == 0 {
+		return true
+	}
+	_, ok := cc.allowed[pkt.Community]
+	if !ok {
+		srcIP := ""
+		if src != nil {
+			srcIP = src.IP.String()
+		}
+		cc.log.Warn("trap rejected: community not in allowlist",
+			"sourceIp", srcIP,
+			"community", pkt.Community,
+		)
+		return false
+	}
+	return true
+}
+
+// startMetrics launches the Prometheus endpoint in a goroutine and returns the
+// *http.Server so the caller can gracefully shut it down.
+func startMetrics(cfg config.MetricsConfig, m *metrics.Metrics, logger *slog.Logger) *http.Server {
 	mux := http.NewServeMux()
 	mux.Handle(cfg.Path, m.Handler())
 	srv := &http.Server{Addr: cfg.ListenAddr, Handler: mux}
-	logger.Info("metrics endpoint listening", "addr", cfg.ListenAddr, "path", cfg.Path)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Error("metrics server failed", "err", err)
-	}
+	go func() {
+		logger.Info("metrics endpoint listening", "addr", cfg.ListenAddr, "path", cfg.Path)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("metrics server failed", "err", err)
+		}
+	}()
+	return srv
 }
 
 // setupLogger configures slog level and output (stdout or rotating file).
@@ -217,12 +403,11 @@ func parseLevel(s string) slog.Level {
 // rotatingWriter appends to a file and rolls it over when it exceeds a size
 // limit, keeping up to maxBackups rotated files.
 type rotatingWriter struct {
-	mu          sync.Mutex
-	path        string
-	maxSize     int64
-	maxBackups  int
-	file        *os.File
-	writeErr    error
+	mu         sync.Mutex
+	path       string
+	maxSize    int64
+	maxBackups int
+	file       *os.File
 }
 
 func newRotatingWriter(path string, maxSizeMB, maxBackups int) *rotatingWriter {
@@ -236,20 +421,29 @@ func newRotatingWriter(path string, maxSizeMB, maxBackups int) *rotatingWriter {
 func (w *rotatingWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.writeErr != nil {
-		return 0, w.writeErr
-	}
+
+	// Ensure file is open.
 	if w.file == nil {
 		f, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 		if err != nil {
-			w.writeErr = err
 			return 0, err
 		}
 		w.file = f
 	}
+
+	// Rotate if this write would exceed the size limit.
 	if info, err := w.file.Stat(); err == nil && info.Size()+int64(len(p)) > w.maxSize {
 		w.rotate()
+		// rotate closes and nulls w.file; reopen for the new write.
+		if w.file == nil {
+			f, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+			if err != nil {
+				return 0, err
+			}
+			w.file = f
+		}
 	}
+
 	return w.file.Write(p)
 }
 

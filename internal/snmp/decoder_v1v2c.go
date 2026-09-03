@@ -1,11 +1,13 @@
 package snmp
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gosnmp/gosnmp"
 )
@@ -75,9 +77,14 @@ func (d *V1V2cDecoder) decodeV1(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapData
 
 	if pkt.GenericTrap >= 0 && pkt.GenericTrap <= 5 {
 		td.TrapOID = v1GenericTrapOIDs[pkt.GenericTrap]
-	} else {
+	} else if pkt.GenericTrap == 6 {
 		// enterpriseSpecific: <enterprise>.<specificTrap>
+		if td.Enterprise == "" {
+			return nil, fmt.Errorf("snmp: enterpriseSpecific trap (generic=6) missing enterprise OID")
+		}
 		td.TrapOID = td.Enterprise + "." + strconv.Itoa(pkt.SpecificTrap)
+	} else {
+		return nil, fmt.Errorf("snmp: invalid generic trap %d (must be 0-6)", pkt.GenericTrap)
 	}
 
 	td.Varbinds = extractVarbinds(pkt.Variables)
@@ -87,6 +94,14 @@ func (d *V1V2cDecoder) decodeV1(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapData
 // decodeV2c handles the v2c format; the trap OID comes from the snmpTrapOID
 // varbind and sysUpTime from the sysUpTime.0 varbind.
 func (d *V1V2cDecoder) decodeV2c(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapData, error) {
+	return decodeV2cFormatPDU(pkt, td)
+}
+
+// decodeV2cFormatPDU parses the PDU body common to v2c and v3 traps:
+// snmpTrapOID from the snmpTrapOID.0 varbind and sysUpTime from
+// sysUpTime.0, then extracts the remaining data varbinds.
+// V3 trap PDUs use the identical SNMPv2-Trap-PDU format as v2c.
+func decodeV2cFormatPDU(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapData, error) {
 	for _, v := range pkt.Variables {
 		oid := trimDot(v.Name)
 		switch oid {
@@ -95,8 +110,13 @@ func (d *V1V2cDecoder) decodeV2c(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapDat
 				td.SysUpTime = uint32(u)
 			}
 		case oidSnmpTrapOID:
-			if s, ok := v.Value.(string); ok {
-				td.TrapOID = trimDot(s)
+			switch val := v.Value.(type) {
+			case string:
+				td.TrapOID = trimDot(val)
+			case []byte:
+				if utf8.Valid(val) {
+					td.TrapOID = trimDot(string(val))
+				}
 			}
 		}
 	}
@@ -124,10 +144,15 @@ func extractVarbinds(pdus []gosnmp.SnmpPDU) []Varbind {
 }
 
 // valueToString renders a decoded SNMP value to a stable string form.
+// Binary (non-UTF-8) OctetString values are hex-encoded to avoid producing
+// unprintable characters in logs and downstream JSON payloads.
 func valueToString(v any) string {
 	switch t := v.(type) {
 	case []byte:
-		return string(t)
+		if utf8.Valid(t) {
+			return string(t)
+		}
+		return "0x" + hex.EncodeToString(t)
 	case nil:
 		return ""
 	default:

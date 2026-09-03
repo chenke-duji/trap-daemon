@@ -2,7 +2,7 @@
 
 > **Language / 语言**：[English](README.en.md) | 中文
 
-高性能、多线程的 SNMP Trap Daemon。接收网络设备上报的 SNMP Trap（v1/v2c），
+高性能、多线程的 SNMP Trap Daemon。接收网络设备上报的 SNMP Trap（v1/v2c/v3），
 将 varbind OID 通过 mib-parser 生成的 OID 数据库映射为字段名，构造 cep-engine
 所需的 `RawEvent` JSON，并通过 REST HTTP 批量转发给 cep-engine。支持
 **Active-Active** 多实例部署（去重由 cep-engine 的 TransportDeduplicator 负责，
@@ -10,7 +10,7 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
 
 ## 功能特性
 
-- **SNMP Trap 接收**：监听 UDP 162，支持 v1/v2c 解析，预留 v3 扩展点
+- **SNMP Trap 接收**：监听 UDP 162，支持 v1/v2c/v3 解析，可同时接收多版本 Trap
 - **OID → 字段名映射**：加载 `oid-database.db`（mib-parser 产物），对
   varbind 完整实例 OID 做最长前缀匹配得到字段名
 - **RawEvent 构造**：严格对齐 cep-engine 摄取契约
@@ -23,7 +23,7 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
 ## 架构
 
 ```
-设备 ──SNMP v1/v2c Trap UDP:162──> trap-daemon
+设备 ──SNMP v1/v2c/v3 Trap UDP:162──> trap-daemon
                                        │
                  ┌─────────────────────┤
                  ▼                     ▼
@@ -51,7 +51,7 @@ trap-daemon/
 ├── cmd/trapd/main.go        # 入口：装配、优雅退出
 ├── internal/
 │   ├── config/              # YAML 配置加载 + env 覆盖
-│   ├── snmp/                # TrapDecoder 接口 + v1/v2c 实现
+│   ├── snmp/                # TrapDecoder 接口 + v1/v2c/v3 实现
 │   ├── oidmap/              # oid-database.db 加载 + 最长前缀匹配
 │   ├── model/               # RawEvent 模型（对齐 cep-engine 契约）
 │   ├── forward/             # 批量队列/背压 + HTTP/Kafka 转发器
@@ -123,8 +123,14 @@ x86_64/aarch64 Linux 发行版。已在 WSL AlmaLinux-8 原生编译（Go 1.27.0
 | 环境变量 | 说明 |
 |---|---|
 | `TRAPD_SNMP_LISTENADDR` | UDP 监听地址 |
-| `TRAPD_SNMP_PROTOCOL` | `v1v2c` / `v3` |
+| `TRAPD_SNMP_PROTOCOL` | `v1v2c` / `v3` / `both` |
 | `TRAPD_SNMP_COMMUNITY` | 可选 community |
+| `TRAPD_SNMP_V3_ENABLED` | 标记 V3 启用（实际以 protocol 为准） |
+| `TRAPD_SNMP_V3_USER` | V3 USM 用户名 |
+| `TRAPD_SNMP_V3_AUTHPROTOCOL` | V3 认证协议（none/MD5/SHA/SHA256/...） |
+| `TRAPD_SNMP_V3_AUTHPASSPHRASE` | V3 认证密钥 |
+| `TRAPD_SNMP_V3_PRIVPROTOCOL` | V3 加密协议（none/DES/AES/AES256/...） |
+| `TRAPD_SNMP_V3_PRIVPASSPHRASE` | V3 加密密钥 |
 | `TRAPD_OIDMAP_PATH` | OID 数据库路径 |
 | `TRAPD_CEPENGINE_BASEURL` | cep-engine 根地址 |
 | `TRAPD_CEPENGINE_AUTHTOKEN` | Bearer token |
@@ -217,11 +223,10 @@ Prometheus 抓取 `GET :9091/metrics`：
 go test ./...
 ```
 
-单元测试覆盖 OID 前缀匹配、v1/v2c 解码、RawEvent 契约、批量队列背压与丢弃、
-配置加载、指标。端到端集成测试用真实 gosnmp 报文验证
+单元测试覆盖 OID 前缀匹配、v1/v2c/v3 解码、RawEvent 契约、批量队列背压与丢弃、
+配置加载与 V3 参数校验、指标。端到端集成测试用真实 gosnmp 报文验证
 UDP → decode → oidmap → RawEvent → HTTP batch 全链路。
 
 ## 待办 / 预留
 
-- SNMPv3 trap 支持（TrapDecoder 接口已预留）
 - Kafka 转发通道（`kafka_forwarder.go` 已预留接口）
