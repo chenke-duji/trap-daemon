@@ -193,7 +193,7 @@ func validate(cfg *Config) error {
 	}
 	// Validate V3 settings when V3 is enabled.
 	if cfg.SNMP.Protocol == "v3" || cfg.SNMP.Protocol == "both" {
-		if err := ValidateV3(cfg.SNMP.V3); err != nil {
+		if err := ValidateV3(&cfg.SNMP.V3); err != nil {
 			return err
 		}
 	}
@@ -236,7 +236,7 @@ var (
 )
 
 // ValidateV3 checks SNMPv3 USM credential consistency.
-func ValidateV3(v3 V3Config) error {
+func ValidateV3(v3 *V3Config) error {
 	if v3.User == "" {
 		return fmt.Errorf("config: snmp.v3.user is required when protocol is v3 or both")
 	}

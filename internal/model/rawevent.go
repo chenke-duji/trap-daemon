@@ -6,7 +6,6 @@ package model
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -117,8 +116,3 @@ func renderRawText(td *snmp.TrapData) string {
 	return b.String()
 }
 
-// checksum returns the hex SHA-256 of a byte payload (used by tests/forwarder).
-func checksum(payload []byte) string {
-	sum := sha256.Sum256(payload)
-	return hex.EncodeToString(sum[:])
-}

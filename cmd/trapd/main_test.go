@@ -22,13 +22,10 @@ func TestParseV3AuthProtocolConsistency(t *testing.T) {
 		if p != "none" {
 			v3.AuthPassphrase = "passphrase123"
 		}
-		if err := config.ValidateV3(v3); err != nil {
+		if err := config.ValidateV3(&v3); err != nil {
 			t.Fatalf("validation rejected valid authProtocol %q: %v", p, err)
 		}
 		got := parseV3AuthProtocol(p)
-		if p == "none" && got != 0 { // NoAuth = 1, but we check via parseV3AuthProtocol
-			// NoAuth is value 1, not 0; just ensure it's the NoAuth constant
-		}
 		// For non-none protocols, ensure we don't get NoAuth (security downgrade)
 		if p != "none" {
 			if got == parseV3AuthProtocol("none") {
@@ -54,7 +51,7 @@ func TestParseV3PrivProtocolConsistency(t *testing.T) {
 		if p != "none" {
 			v3.PrivPassphrase = "passphrase456"
 		}
-		if err := config.ValidateV3(v3); err != nil {
+		if err := config.ValidateV3(&v3); err != nil {
 			t.Fatalf("validation rejected valid privProtocol %q: %v", p, err)
 		}
 		got := parseV3PrivProtocol(p)
@@ -80,7 +77,7 @@ func TestV3SecurityLevel(t *testing.T) {
 	}
 	for _, c := range cases {
 		v3 := config.V3Config{AuthProtocol: c.auth, PrivProtocol: c.priv}
-		got := v3SecurityLevel(v3)
+		got := v3SecurityLevel(&v3)
 		if got != c.want {
 			t.Errorf("v3SecurityLevel(auth=%q, priv=%q) = %q, want %q", c.auth, c.priv, got, c.want)
 		}

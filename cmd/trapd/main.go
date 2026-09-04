@@ -32,7 +32,7 @@ import (
 // snmpV3Params builds a gosnmp.GoSNMP configured for V3 USM trap reception.
 // UnmarshalTrap auto-detects the packet version from the header, so this
 // listener can also decode v1/v2c traps when protocol is "both".
-func snmpV3Params(v3 config.V3Config, logger *slog.Logger) *gosnmp.GoSNMP {
+func snmpV3Params(v3 *config.V3Config, logger *slog.Logger) *gosnmp.GoSNMP {
 	authProto := parseV3AuthProtocol(v3.AuthProtocol)
 	privProto := parseV3PrivProtocol(v3.PrivProtocol)
 
@@ -111,7 +111,7 @@ func parseV3PrivProtocol(s string) gosnmp.SnmpV3PrivProtocol {
 }
 
 // v3SecurityLevel returns the SNMPv3 security level label for logging.
-func v3SecurityLevel(v3 config.V3Config) string {
+func v3SecurityLevel(v3 *config.V3Config) string {
 	auth := parseV3AuthProtocol(v3.AuthProtocol)
 	priv := parseV3PrivProtocol(v3.PrivProtocol)
 	switch {
@@ -217,8 +217,8 @@ func main() {
 	if v3Enabled {
 		// V3 params also handle v1/v2c: UnmarshalTrap auto-detects version
 		// from the packet header, so a single listener covers "both".
-		tl.Params = snmpV3Params(cfg.SNMP.V3, logger)
-		secLevel := v3SecurityLevel(cfg.SNMP.V3)
+		tl.Params = snmpV3Params(&cfg.SNMP.V3, logger)
+		secLevel := v3SecurityLevel(&cfg.SNMP.V3)
 		logger.Info("SNMPv3 trap reception enabled",
 			"user", cfg.SNMP.V3.User,
 			"authProtocol", cfg.SNMP.V3.AuthProtocol,

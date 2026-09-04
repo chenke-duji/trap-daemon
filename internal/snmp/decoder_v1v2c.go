@@ -73,17 +73,18 @@ func (d *V1V2cDecoder) decodeV1(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapData
 	td.GenericTrap = pkt.GenericTrap
 	td.SpecificTrap = pkt.SpecificTrap
 	td.AgentAddress = pkt.AgentAddress
-	td.SysUpTime = uint32(pkt.Timestamp)
+	td.SysUpTime = uint32(pkt.Timestamp) //#nosec G115 -- TimeTicks is a 32-bit protocol field
 
-	if pkt.GenericTrap >= 0 && pkt.GenericTrap <= 5 {
+	switch {
+	case pkt.GenericTrap >= 0 && pkt.GenericTrap <= 5:
 		td.TrapOID = v1GenericTrapOIDs[pkt.GenericTrap]
-	} else if pkt.GenericTrap == 6 {
+	case pkt.GenericTrap == 6:
 		// enterpriseSpecific: <enterprise>.<specificTrap>
 		if td.Enterprise == "" {
 			return nil, fmt.Errorf("snmp: enterpriseSpecific trap (generic=6) missing enterprise OID")
 		}
 		td.TrapOID = td.Enterprise + "." + strconv.Itoa(pkt.SpecificTrap)
-	} else {
+	default:
 		return nil, fmt.Errorf("snmp: invalid generic trap %d (must be 0-6)", pkt.GenericTrap)
 	}
 
