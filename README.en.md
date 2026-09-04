@@ -172,7 +172,7 @@ multi-instance, WSL native build) is in
 ## cep-engine contract
 
 The `RawEvent` JSON built by the daemon (field names strictly matching
-cep-engine `com.raysdata.cep.model.RawEvent`):
+cep-engine `com.dujitech.cep.model.RawEvent`):
 
 ```json
 {

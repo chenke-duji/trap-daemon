@@ -164,7 +164,7 @@ Windows 下监听 162 端口同样需要管理员权限（否则改用 `:1162`�
 
 ## 与 cep-engine 的对接契约
 
-daemon 构造的 `RawEvent` JSON（字段名与 cep-engine `com.raysdata.cep.model.RawEvent`
+daemon 构造的 `RawEvent` JSON（字段名与 cep-engine `com.dujitech.cep.model.RawEvent`
 严格一致）：
 
 ```json
