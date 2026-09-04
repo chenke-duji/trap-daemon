@@ -107,7 +107,7 @@ func decodeV2cFormatPDU(pkt *gosnmp.SnmpPacket, td *TrapData) (*TrapData, error)
 		switch oid {
 		case oidSysUpTime:
 			if u, ok := toUint64(v.Value); ok {
-				td.SysUpTime = uint32(u)
+				td.SysUpTime = uint32(u) //#nosec G115 -- TimeTicks is a 32-bit protocol field
 			}
 		case oidSnmpTrapOID:
 			switch val := v.Value.(type) {
@@ -161,9 +161,14 @@ func valueToString(v any) string {
 }
 
 // toUint64 extracts a uint64 from common SNMP numeric value types.
+// Signed integer types are accepted only when non-negative (SNMP counters and
+// TimeTicks are unsigned by definition), avoiding G115 overflow concerns.
 func toUint64(v any) (uint64, bool) {
 	switch t := v.(type) {
 	case int:
+		if t < 0 {
+			return 0, false
+		}
 		return uint64(t), true
 	case uint:
 		return uint64(t), true
@@ -172,8 +177,14 @@ func toUint64(v any) (uint64, bool) {
 	case uint64:
 		return t, true
 	case int32:
+		if t < 0 {
+			return 0, false
+		}
 		return uint64(t), true
 	case int64:
+		if t < 0 {
+			return 0, false
+		}
 		return uint64(t), true
 	default:
 		return 0, false

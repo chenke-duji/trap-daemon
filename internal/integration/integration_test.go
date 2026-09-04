@@ -73,7 +73,7 @@ func setupPipeline(t *testing.T, mock *mockCEPServer) (*gosnmp.TrapListener, int
 	srv := httptest.NewServer(mock.handler())
 	t.Cleanup(srv.Close)
 
-	fwd, err := forward.NewHTTPForwarder(forward.HTTPConfig{
+	fwd, err := forward.NewHTTPForwarder(&forward.HTTPConfig{
 		BaseURL:   srv.URL,
 		BatchPath: "/api/v1/events/batch",
 		Timeout:   2000,

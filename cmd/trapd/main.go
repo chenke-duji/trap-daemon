@@ -179,7 +179,7 @@ func main() {
 		return 0
 	})
 
-	fwd, err := forward.NewHTTPForwarder(forward.HTTPConfig{
+	fwd, err := forward.NewHTTPForwarder(&forward.HTTPConfig{
 		BaseURL:    cfg.CEPEngine.BaseURL,
 		BatchPath:  cfg.CEPEngine.BatchPath,
 		SinglePath: cfg.CEPEngine.SinglePath,
@@ -358,7 +358,11 @@ func (cc *communityChecker) accept(pkt *gosnmp.SnmpPacket, src *net.UDPAddr) boo
 func startMetrics(cfg config.MetricsConfig, m *metrics.Metrics, logger *slog.Logger) *http.Server {
 	mux := http.NewServeMux()
 	mux.Handle(cfg.Path, m.Handler())
-	srv := &http.Server{Addr: cfg.ListenAddr, Handler: mux}
+	srv := &http.Server{
+		Addr:              cfg.ListenAddr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second, // G112: mitigate Slowloris
+	}
 	go func() {
 		logger.Info("metrics endpoint listening", "addr", cfg.ListenAddr, "path", cfg.Path)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
