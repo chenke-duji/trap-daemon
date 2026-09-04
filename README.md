@@ -230,3 +230,7 @@ UDP → decode → oidmap → RawEvent → HTTP batch 全链路。
 ## 待办 / 预留
 
 - Kafka 转发通道（`kafka_forwarder.go` 已预留接口）
+
+## Contact
+
+- Email: chenke@dujitech.cn
