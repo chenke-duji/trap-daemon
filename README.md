@@ -20,6 +20,31 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
 - **自监控**：Prometheus 文本格式 `/metrics`，含启动时间、累计 trap 数、last 5min 吞吐量
 - **配置化**：YAML + 环境变量覆盖
 
+## 支持的协议规范
+
+### SNMP Trap（UDP 162）
+
+| 协议版本 | 规范 | 说明 |
+|---|---|---|
+| SNMPv1 | RFC 1157 | Enterprise / GenericTrap / SpecificTrap 头部，6 类标准 trap + 企业特定 trap |
+| SNMPv2c | RFC 3416 / RFC 3417 | SNMPv2-Trap-PDU 格式，`snmpTrapOID` 和 `sysUpTime` 作为 varbind 携带 |
+| SNMPv3 | RFC 3411–3418 | PDU 格式与 v2c 一致，增加 USM 认证与加密 |
+
+### SNMPv3 USM 安全模型（RFC 3414）
+
+| 类型 | 支持的算法 |
+|---|---|
+| 认证 (Auth) | none、MD5、SHA、SHA224、SHA256、SHA384、SHA512 |
+| 加密 (Priv) | none、DES、AES、AES192、AES256、AES192C、AES256C |
+
+- 加密 (Priv) 要求认证 (Auth) 非 none（RFC 3414 约束）
+- 口令长度 8–255 字符（RFC 3414 要求）
+- v1/v2c 支持可选 Community 白名单
+
+### OID 映射
+
+varbind OID 通过 mib-parser 生成的 `oid-database.db` 做最长前缀匹配，映射为字段名。无法映射的 OID 保留完整实例 OID 作为 key。
+
 ## 架构
 
 ```
