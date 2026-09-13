@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **CHANGELOG.md**: this file, to track notable changes going forward.
+- **SUPPORTED-MIBS.md / SUPPORTED-MIBS.zh-CN.md**: bilingual (English / 简体中文)
+  list of the SNMP MIB modules supported by the OID database (`oid-database.db`),
+  organized by vendor. Cross-linked from `README.md` / `README.en.md`.
 
 ---
 

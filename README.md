@@ -20,6 +20,9 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
 - **自监控**：Prometheus 文本格式 `/metrics`，含启动时间、累计 trap 数、last 5min 吞吐量
 - **配置化**：YAML + 环境变量覆盖
 
+> 支持的 SNMP MIB 模块完整清单见 [SUPPORTED-MIBS.md](SUPPORTED-MIBS.md)
+> （中文：[SUPPORTED-MIBS.zh-CN.md](SUPPORTED-MIBS.zh-CN.md)）。
+
 ## 支持的协议规范
 
 ### SNMP Trap（UDP 162）

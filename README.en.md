@@ -25,6 +25,9 @@ Kafka is reserved as an optional forwarding channel.
   traps, and last-5-minute throughput
 - **Configuration**: YAML + environment-variable overrides
 
+> See [SUPPORTED-MIBS.md](SUPPORTED-MIBS.md) for the complete list of supported
+> SNMP MIB modules (中文：[SUPPORTED-MIBS.zh-CN.md](SUPPORTED-MIBS.zh-CN.md)).
+
 ## Supported Protocol Specifications
 
 ### SNMP Trap (UDP 162)
