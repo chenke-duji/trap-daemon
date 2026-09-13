@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SUPPORTED-MIBS.md / SUPPORTED-MIBS.zh-CN.md**: bilingual (English / 简体中文)
   list of the SNMP MIB modules supported by the OID database (`oid-database.db`),
   organized by vendor. Cross-linked from `README.md` / `README.en.md`.
+- **oid-database.db**: bundled a full OID database (482322 entries) at the repo
+  root, so trap-daemon can be deployed without running mib-parser first. See
+  `config.example.yaml` / `DEPLOY.md` for usage.
 
 ---
 

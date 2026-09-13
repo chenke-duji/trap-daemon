@@ -6,15 +6,18 @@
 
 - Go 1.22+（仅构建时需要；运行只需编译产物二进制）
 - cep-engine 已部署并可通过 `cepEngine.baseUrl` 访问
-- mib-parser 生成的 `oid-database.db` 已持久化（`oidMap.path` 指向它）。全量库在
-  mib-parser 产物目录生成，部署时拷贝到 daemon 目录，例如：
+- `oid-database.db` 已就绪（`oidMap.path` 指向它）。仓库根目录已内置一份全量库
+  （482322 条目，覆盖范围见 `SUPPORTED-MIBS.md`），部署时直接拷贝：
 
   ```bash
-  # 从 mib-parser 全量产物拷贝到本机部署位置
+  # 用仓库内置的全量库
   mkdir -p /opt/trap-daemon
-  cp D:/63.CEP/mib-parser/output/oid-database.db /opt/trap-daemon/oid-database.db
+  cp oid-database.db /opt/trap-daemon/oid-database.db
   # 然后在 config.yaml 中 oidMap.path 指向 /opt/trap-daemon/oid-database.db
   ```
+
+  若需更新到 mib-parser 最新产物，可从
+  `D:/63.CEP/mib-parser/output/oid-database.db` 重新拷贝覆盖。
 
 ## 构建
 

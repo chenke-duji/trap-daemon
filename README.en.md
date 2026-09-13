@@ -28,6 +28,17 @@ Kafka is reserved as an optional forwarding channel.
 > See [SUPPORTED-MIBS.md](SUPPORTED-MIBS.md) for the complete list of supported
 > SNMP MIB modules (中文：[SUPPORTED-MIBS.zh-CN.md](SUPPORTED-MIBS.zh-CN.md)).
 
+## Throughput
+
+Measured on WSL AlmaLinux-8 (16 vCPU / 15.7 GB RAM), single-node MongoDB 6.0:
+
+- **Receive > 20,000 traps/s** (UDP receive has no pressure)
+- **Forward bottleneck ~15,000 traps/s** (bounded by cep-engine write speed);
+  beyond that the queue fills and drops per policy
+
+> Increase `forward.queueCapacity` / `forward.workers` to reduce drops under
+> high throughput.
+
 ## Supported Protocol Specifications
 
 ### SNMP Trap (UDP 162)

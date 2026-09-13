@@ -23,6 +23,15 @@ daemon 本身无状态）。Kafka 作为可选转发通道预留。
 > 支持的 SNMP MIB 模块完整清单见 [SUPPORTED-MIBS.md](SUPPORTED-MIBS.md)
 > （中文：[SUPPORTED-MIBS.zh-CN.md](SUPPORTED-MIBS.zh-CN.md)）。
 
+## 吞吐能力
+
+在 WSL AlmaLinux-8（16 核 / 15.7G 内存）、单机 MongoDB 6.0 下实测：
+
+- **接收能力 > 20000 条/秒**（UDP 收包无压力）
+- **转发瓶颈约 15000 条/秒**（受 cep-engine 写入速度限制），超限后队列满按 drop 策略丢弃
+
+> 高吞吐时调大 `forward.queueCapacity` / `forward.workers` 可降低丢弃率。
+
 ## 支持的协议规范
 
 ### SNMP Trap（UDP 162）
