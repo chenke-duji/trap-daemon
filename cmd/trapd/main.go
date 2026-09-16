@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -138,7 +139,44 @@ var (
 	buildDate    = "unknown"
 )
 
+// fillBuildInfo 在 ldflags 未注入版本时，从 Go 的 VCS 构建信息兜底填充，
+// 避免直接 go build（未走 Makefile）时 -v 显示 "dev (unknown)"。
+func fillBuildInfo() {
+	if buildVersion != "dev" {
+		return
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	var rev, ts string
+	modified := false
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.time":
+			ts = s.Value
+		case "vcs.modified":
+			modified = s.Value == "true"
+		}
+	}
+	if rev != "" {
+		buildVersion = rev
+		if len(buildVersion) > 8 {
+			buildVersion = buildVersion[:8]
+		}
+		if modified {
+			buildVersion += "-dirty"
+		}
+	}
+	if ts != "" {
+		buildDate = ts
+	}
+}
+
 func main() {
+	fillBuildInfo()
 	flag.Parse()
 	if *v || *version {
 		fmt.Printf("trap-daemon %s (%s)\n", buildVersion, buildDate)
