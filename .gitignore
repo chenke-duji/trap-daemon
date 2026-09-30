@@ -1,6 +1,7 @@
 # Build outputs
 /bin/
 /build/
+/release/
 
 # Local config
 /config.yaml

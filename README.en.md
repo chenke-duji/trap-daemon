@@ -1,6 +1,12 @@
 # trap-daemon
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.24-00ADD8.svg?logo=go&logoColor=white)](go.mod)
+[![Release](https://img.shields.io/github/v/release/chenke-duji/trap-daemon)](https://github.com/chenke-duji/trap-daemon/releases)
+
 > **Language / 语言**: [中文](README.md) | English
+
+> **>20,000 traps/s receive · OID auto-mapping (482k OID DB) · Active-Active · Prometheus metrics**
 
 A high-performance, multi-threaded SNMP Trap Daemon. It receives SNMP Traps
 (v1/v2c/v3) from network devices, maps varbind OIDs to field names using the OID
@@ -9,6 +15,15 @@ cep-engine, and forwards it in batches to cep-engine over REST HTTP. It is
 designed for **Active-Active** multi-instance deployment (deduplication is
 handled by cep-engine's TransportDeduplicator; the daemon itself is stateless).
 Kafka is reserved as an optional forwarding channel.
+
+```mermaid
+flowchart LR
+    A[Network devices<br/>SNMP Trap v1/v2c/v3] -->|UDP 162| B[trap-daemon]
+    B --> C[(oid-database.db<br/>OID → field name)]
+    B -->|REST batch forward| D[cep-engine]
+    D --> E[(MongoDB)]
+    B -.->|self-monitor| F[/metrics/]
+```
 
 ## Features
 

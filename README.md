@@ -1,12 +1,27 @@
 # trap-daemon
 
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.24-00ADD8.svg?logo=go&logoColor=white)](go.mod)
+[![Release](https://img.shields.io/github/v/release/chenke-duji/trap-daemon)](https://github.com/chenke-duji/trap-daemon/releases)
+
 > **Language / 语言**：[English](README.en.md) | 中文
+
+> **>20,000 traps/s 接收 · OID 自动映射（48 万条 OID 库）· Active-Active · Prometheus 自监控**
 
 高性能、多线程的 SNMP Trap Daemon。接收网络设备上报的 SNMP Trap（v1/v2c/v3），
 将 varbind OID 通过 mib-parser 生成的 OID 数据库映射为字段名，构造 cep-engine
 所需的 `RawEvent` JSON，并通过 REST HTTP 批量转发给 cep-engine。支持
 **Active-Active** 多实例部署（去重由 cep-engine 的 TransportDeduplicator 负责，
 daemon 本身无状态）。Kafka 作为可选转发通道预留。
+
+```mermaid
+flowchart LR
+    A[网络设备<br/>SNMP Trap v1/v2c/v3] -->|UDP 162| B[trap-daemon]
+    B --> C[(oid-database.db<br/>OID → 字段名)]
+    B -->|REST 批量转发| D[cep-engine]
+    D --> E[(MongoDB)]
+    B -.->|自监控| F[/metrics/]
+```
 
 ## 功能特性
 
